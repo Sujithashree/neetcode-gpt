@@ -4,10 +4,8 @@ from torchtyping import TensorType
 
 
 class SingleHeadAttention(nn.Module):
-
     def __init__(self, embedding_dim: int, attention_dim: int):
         super().__init__()
-
         torch.manual_seed(0)
 
         self.key = nn.Linear(
@@ -28,41 +26,35 @@ class SingleHeadAttention(nn.Module):
             bias=False
         )
 
-        self.attention_dim = attention_dim
-
     def forward(
         self,
         embedded: TensorType[float]
     ) -> TensorType[float]:
 
-        # Q, K, V
-        K = self.key(embedded)
+        # (B, T, D) -> (B, T, A)
         Q = self.query(embedded)
+        K = self.key(embedded)
         V = self.value(embedded)
 
-        # Q @ K^T
+        # Attention scores: (B, T, T)
         scores = Q @ K.transpose(-2, -1)
 
         # Scale by sqrt(d_k)
-        scores = scores / (self.attention_dim ** 0.5)
+        scores = scores / (self.query.out_features ** 0.5)
 
-        # Causal mask
-        context_length = embedded.shape[1]
+        # Causal mask: prevent attending to future tokens
+        T = embedded.shape[1]
+        mask = torch.triu(
+            torch.ones(T, T, device=embedded.device),
+            diagonal=1
+        ).bool()
 
-        mask = torch.tril(
-            torch.ones(
-                context_length,
-                context_length,
-                dtype=torch.bool,
-                device=embedded.device
-            )
-        )
+        scores = scores.masked_fill(mask, float("-inf"))
 
-        # Future positions -> -infinity
-        scores = scores.masked_fill(~mask, float("-inf"))
+        # Convert scores to attention probabilities
+        attention_weights = torch.softmax(scores, dim=-1)
 
-        # Convert scores to probabilities
-        weights = torch.softmax(scores, dim=-1)
+        # Weighted sum of values: (B, T, A)
+        output = attention_weights @ V
 
-        # Weighted sum of V
-        return weights @ V
+        return output
