@@ -11,7 +11,10 @@ class Solution:
 
         def make_hook():
             def hook(module, inputs, output):
-                # output shape: [batch_size, neurons]
+                # output shape: (batch_size, number_of_neurons)
+
+                # A neuron is dead if it outputs 0
+                # for every sample in the batch
                 dead = (output == 0).all(dim=0)
 
                 dead_fraction = dead.float().mean().item()
@@ -20,7 +23,7 @@ class Solution:
 
             return hook
 
-        # Add hooks to every ReLU layer
+        # Register a hook after every ReLU
         for layer in model.modules():
             if isinstance(layer, nn.ReLU):
                 hooks.append(
@@ -42,15 +45,15 @@ class Solution:
         if not dead_fractions:
             return "healthy"
 
-        # 1. Severe death
+        # 1. Severe dead neurons
         if any(x > 0.5 for x in dead_fractions):
             return "use_leaky_relu"
 
-        # 2. First layer has significant death
+        # 2. First layer has too many dead neurons
         if dead_fractions[0] > 0.3:
             return "reinitialize"
 
-        # 3. Strictly increasing with depth
+        # 3. Dead neurons strictly increase with depth
         increasing = True
 
         for i in range(1, len(dead_fractions)):
