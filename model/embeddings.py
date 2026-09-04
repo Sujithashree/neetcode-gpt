@@ -7,5 +7,7 @@ class Solution:
         embeddings: NDArray[np.float64],
         token_ids: NDArray[np.int64]
     ) -> NDArray[np.float64]:
+
         result = embeddings[token_ids]
+
         return np.round(result, 5)
