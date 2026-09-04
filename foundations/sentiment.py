@@ -5,6 +5,7 @@ from torchtyping import TensorType
 class Solution(nn.Module):
     def __init__(self, vocabulary_size: int):
         super().__init__()
+
         torch.manual_seed(0)
 
         self.embedding = nn.Embedding(vocabulary_size, 16)
@@ -12,6 +13,7 @@ class Solution(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x: TensorType[int]) -> TensorType[float]:
+
         # (B, T) -> (B, T, 16)
         embedded = self.embedding(x.long())
 
@@ -21,7 +23,7 @@ class Solution(nn.Module):
         # (B, 16) -> (B, 1)
         output = self.linear(averaged)
 
-        # Sigmoid -> values in [0, 1]
+        # (B, 1) -> (B, 1), values between 0 and 1
         output = self.sigmoid(output)
 
-        return torch.round(output, decimals=4)
+        return output
