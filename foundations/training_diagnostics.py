@@ -8,31 +8,26 @@ class Solution:
         stats = []
         hooks = []
 
-        def make_hook():
-            def hook(module, inputs, output):
-                # output shape: [batch_size, features]
-                mean = output.mean().item()
-                std = output.std().item()
+        def hook_fn(module, inputs, output):
+            mean = output.mean().item()
+            std = output.std().item()
 
-                # A neuron is dead if its output <= 0
-                # for every sample in the batch
-                dead = (output <= 0).all(dim=0)
-                dead_fraction = dead.float().mean().item()
+            # A neuron is dead if output <= 0
+            # for every sample in the batch
+            dead = (output <= 0).all(dim=0)
+            dead_fraction = dead.float().mean().item()
 
-                stats.append({
-                    "mean": round(mean, 4),
-                    "std": round(std, 4),
-                    "dead_fraction": round(dead_fraction, 4)
-                })
+            stats.append({
+                "mean": round(mean, 4),
+                "std": round(std, 4),
+                "dead_fraction": round(dead_fraction, 4)
+            })
 
-            return hook
-
-        # Register hooks only on Linear layers
+        # Hook every Linear layer
         for layer in model.modules():
             if isinstance(layer, nn.Linear):
-                hooks.append(layer.register_forward_hook(make_hook()))
+                hooks.append(layer.register_forward_hook(hook_fn))
 
-        # Forward pass without gradients
         with torch.no_grad():
             model(x)
 
@@ -45,18 +40,17 @@ class Solution:
     def compute_gradient_stats(self, model, x, y):
         model.zero_grad()
 
-        stats = []
-
-        # Forward pass
+        # Forward
         output = model(x)
 
         # MSE loss
         loss = nn.MSELoss()(output, y)
 
-        # Backward pass
+        # Backward
         loss.backward()
 
-        # Collect gradients from Linear layers
+        stats = []
+
         for layer in model.modules():
             if isinstance(layer, nn.Linear):
                 grad = layer.weight.grad
@@ -85,7 +79,7 @@ class Solution:
         if gradient_stats[-1]["norm"] < 1e-5:
             return "vanishing_gradients"
 
-        # 4. Activation statistics
+        # 4. Check activation standard deviation
         for stat in activation_stats:
             if stat["std"] < 0.1:
                 return "vanishing_gradients"
