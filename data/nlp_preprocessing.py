@@ -20,18 +20,24 @@ class Solution:
             for word in sentence.split()
         ))
 
-        # Assign IDs starting from 1
-        word_to_id = {word: i + 1 for i, word in enumerate(vocab)}
+        # Word -> ID, starting from 1
+        word_to_id = {
+            word: i + 1
+            for i, word in enumerate(vocab)
+        }
 
-        # Encode each sentence
+        # Convert sentences to lists of IDs
         encoded = []
+
         for sentence in sentences:
             ids = [word_to_id[word] for word in sentence.split()]
             encoded.append(torch.tensor(ids, dtype=torch.float))
 
         # Pad shorter sentences with 0
-        return nn.utils.rnn.pad_sequence(
+        result = torch.nn.utils.rnn.pad_sequence(
             encoded,
             batch_first=True,
             padding_value=0
         )
+
+        return result
