@@ -1,56 +1,74 @@
 import torch
 import torch.nn as nn
-from torchtyping import TensorType
-
+import torch.nn.functional as F
 
 class Solution:
-    def generate(
+    def train(
         self,
-        model,
-        new_chars: int,
-        context: TensorType[int],
+        model: nn.Module,
+        data: torch.Tensor,
+        epochs: int,
         context_length: int,
-        int_to_char: dict
-    ) -> str:
+        batch_size: int,
+        lr: float
+    ) -> float:
 
-        # Fixed random generator for reproducible output
-        generator = torch.manual_seed(0)
-        initial_state = generator.get_state()
+        # AdamW optimizer
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=lr
+        )
 
-        generated = []
+        loss = None
 
-        for _ in range(new_chars):
+        for epoch in range(epochs):
 
-            # Keep only the most recent context_length tokens
-            context = context[:, -context_length:]
+            # Reproducible batch sampling
+            torch.manual_seed(epoch)
 
-            # Model output:
-            # (1, seq_len, vocab_size)
-            logits = model(context)
-
-            # Get logits for the last token position
-            # (1, vocab_size)
-            logits = logits[:, -1, :]
-
-            # Convert logits to probabilities
-            probs = torch.softmax(logits, dim=-1)
-
-            # Sample one token
-            # Shape: (1, 1)
-            next_token = torch.multinomial(
-                probs,
-                num_samples=1,
-                generator=generator
+            # Random starting positions
+            starts = torch.randint(
+                0,
+                len(data) - context_length,
+                (batch_size,)
             )
 
-            # Add token to context
-            context = torch.cat(
-                [context, next_token],
-                dim=1
+            # Build input and target batches
+            X = torch.stack([
+                data[i:i + context_length]
+                for i in starts
+            ])
+
+            Y = torch.stack([
+                data[i + 1:i + context_length + 1]
+                for i in starts
+            ])
+
+            # Forward pass
+            logits = model(X)
+
+            # logits: (B, T, C)
+            # targets: (B, T)
+            #
+            # Cross entropy expects:
+            # input  -> (N, C)
+            # target -> (N)
+
+            B, T, C = logits.shape
+
+            logits_flat = logits.reshape(B * T, C)
+            targets_flat = Y.reshape(B * T)
+
+            # Calculate loss
+            loss = F.cross_entropy(
+                logits_flat,
+                targets_flat
             )
 
-            # Convert token ID to character
-            token_id = next_token.item()
-            generated.append(int_to_char[token_id])
+            # Backpropagation
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        return "".join(generated)
+        # Return final loss rounded to 4 decimals
+        return round(loss.item(), 4)
