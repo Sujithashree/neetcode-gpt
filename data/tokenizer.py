@@ -1,5 +1,4 @@
 from typing import List
-from collections import Counter
 
 
 class Solution:
@@ -10,23 +9,21 @@ class Solution:
         merges = []
 
         for _ in range(num_merges):
-            # If fewer than 2 tokens remain, no pair can be merged
-            if len(tokens) < 2:
+            # Count adjacent pairs
+            pair_count = {}
+
+            for i in range(len(tokens) - 1):
+                pair = (tokens[i], tokens[i + 1])
+                pair_count[pair] = pair_count.get(pair, 0) + 1
+
+            # No more pairs to merge
+            if not pair_count:
                 break
 
-            # Count adjacent pairs
-            pair_counts = Counter(
-                (tokens[i], tokens[i + 1])
-                for i in range(len(tokens) - 1)
-            )
-
-            # Find the most frequent pair.
-            # max() with (-count, pair) gives:
-            #   1. highest count
-            #   2. lexicographically smallest pair on ties
+            # Maximum frequency, then lexicographically smallest pair
             best_pair = min(
-                pair_counts,
-                key=lambda pair: (-pair_counts[pair], pair)
+                pair_count,
+                key=lambda pair: (-pair_count[pair], pair)
             )
 
             a, b = best_pair
@@ -34,7 +31,7 @@ class Solution:
             # Record the merge
             merges.append([a, b])
 
-            # Merge non-overlapping occurrences left to right
+            # Merge non-overlapping occurrences from left to right
             new_tokens = []
             i = 0
 
